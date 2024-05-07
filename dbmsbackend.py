@@ -234,7 +234,7 @@ def make_transaction():
             conn.close()
                        
 # Function to display customer information by ID
-def get_customer_info_by_id():
+def display_customer_info_by_id():
     conn = connect()
     if conn:
         try:
@@ -251,13 +251,114 @@ def get_customer_info_by_id():
                 print("Address:", row[1])
                 print("Phone Number:", row[2])
                 print("Birthday:", row[3])
-                print("Deliveries Address:", row[4])
-                print("Order Item Name:", row[5])
-                print("Transaction Amount:", row[6])
-                print("Reservation Table ID:", row[7])
-                print("Reservation Date:", row[8])
         except psycopg2.Error as e:
             print("Error occurred while fetching customer information.")
+            print(e)
+        finally:
+            if cursor:
+                cursor.close()
+            conn.close()
+            # Function to display transactions by customer ID
+def display_transactions_by_customer_id():
+    conn = connect()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            customer_id = int(input("Enter customer ID: "))
+            cursor.callproc("get_transactions_by_customer_id", (customer_id,))
+            transactions = cursor.fetchall()
+            if not transactions:
+                print("No transactions found for the customer.")
+                return
+            print("\nTransactions for Customer ID:", customer_id)
+            for transaction in transactions:
+                print("Transaction ID:", transaction[0])
+                print("Amount:", transaction[1])
+                print("Payment Method:", transaction[2])
+                print("Time:", transaction[3])
+                print("Tips:", transaction[4])
+        except psycopg2.Error as e:
+            print("Error occurred while fetching transactions.")
+            print(e)
+        finally:
+            if cursor:
+                cursor.close()
+            conn.close()
+
+# Function to display delivery information by customer ID
+def display_delivery_by_customer_id():
+    conn = connect()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            customer_id = int(input("Enter customer ID: "))
+            cursor.callproc("get_delivery_by_customer_id", (customer_id,))
+            deliveries = cursor.fetchall()
+            if not deliveries:
+                print("No deliveries found for the customer.")
+                return
+            print("\nDeliveries for Customer ID:", customer_id)
+            for delivery in deliveries:
+                print("Delivery ID:", delivery[0])
+                print("Delivery Status:", delivery[1])
+                print("Address:", delivery[2])
+        except psycopg2.Error as e:
+            print("Error occurred while fetching deliveries.")
+            print(e)
+        finally:
+            if cursor:
+                cursor.close()
+            conn.close()
+
+# Function to display reservations by customer ID
+def display_reservations_by_customer_id():
+    conn = connect()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            customer_id = int(input("Enter customer ID: "))
+            cursor.callproc("get_reservations_by_customer_id", (customer_id,))
+            reservations = cursor.fetchall()
+            if not reservations:
+                print("No reservations found for the customer.")
+                return
+            print("\nReservations for Customer ID:", customer_id)
+            for reservation in reservations:
+                print("Reservation ID:", reservation[0])
+                print("Table ID:", reservation[1])
+                print("Date:", reservation[2])
+                print("Size:", reservation[3])
+        except psycopg2.Error as e:
+            print("Error occurred while fetching reservations.")
+            print(e)
+        finally:
+            if cursor:
+                cursor.close()
+            conn.close()
+
+# Function to display orders by customer ID
+def display_orders_by_customer_id():
+    conn = connect()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            customer_id = int(input("Enter customer ID: "))
+            cursor.callproc("get_orders_by_customer_id", (customer_id,))
+            orders = cursor.fetchall()
+            if not orders:
+                print("No orders found for the customer.")
+                return
+            print("\nOrders for Customer ID:", customer_id)
+            for order in orders:
+                print("Order ID:", order[0])
+                print("Table ID:", order[1])
+                print("Delivery ID:", order[2])
+                print("Is Delivery:", order[3])
+                print("Order Status:", order[4])
+                print("Waiter ID:", order[5])
+                print("Transaction ID:", order[6])
+        except psycopg2.Error as e:
+            print("Error occurred while fetching orders.")
             print(e)
         finally:
             if cursor:
@@ -269,7 +370,6 @@ def get_customer_info_by_id():
 def main():
     while True:
         print("\nSelect an option:")
-        print("A. Create a new customer")
         print("1. Reserve a table")
         print("2. Remove table reservation")
         print("3. Make an order")
@@ -280,7 +380,8 @@ def main():
         print("8. Change delivery status")
         print("9. Make a transaction")
         print("0. Exit")
-        print("B. Display customer information by ID")
+        print("A. Create a new customer")
+        print("B. Display options")
 
         choice = input("Enter your choice: ")
         if choice == "1":   
@@ -304,7 +405,29 @@ def main():
         elif choice.upper() == "A":
             create_customer()
         elif choice.upper() == "B":
-            get_customer_info_by_id()
+            print("\nSelect an option to display:")
+            print("1. Customer information")
+            print("2. Transactions")
+            print("3. Deliveries")
+            print("4. Reservations")
+            print("5. Orders")
+            print("0. Back")
+            choice = input("Enter your choice: ")
+            if choice == "1":
+                display_customer_info_by_id()
+            elif choice == "2":
+                display_transactions_by_customer_id()
+            elif choice == "3":
+                display_delivery_by_customer_id()
+            elif choice == "4":
+                display_reservations_by_customer_id()
+            elif choice == "5":
+                display_orders_by_customer_id()
+            elif choice == "0":
+                break
+            else:
+                print("Invalid choice. Please try again.")
+                
         elif choice == "0":
             break
         else:
