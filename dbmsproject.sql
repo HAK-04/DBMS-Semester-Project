@@ -3,17 +3,21 @@ create table customers(customer_id serial primary key,name varchar(100) not null
 
 create table tables (table_id serial primary key, capacity int, is_available boolean);
 
-create table waiter(waiter_id serial primary key, waiter_name varchar(100) not null, waiter_tips int default null);
-
 create table transactions(transaction_id serial primary key,amount numeric(10,2),payment_method varchar,
     date date,tips numeric(10,2));
+alter table transactions add column customer_id int;
+alter table transactions add constraint fk_customer_id foreign key (customer_id) references customers(customer_id); 
 
 create table delivery(delivery_id serial primary key,delivery_status varchar,address varchar(100));
+alter table delivery add column customer_id int;
+alter table delivery drop column delivery_status;
+alter table delivery add constraint fk_customer_id foreign key (customer_id) references customers(customer_id); 
+select * from delivery;
 
 create table orders(order_id serial primary key,customer_id int,table_id int,deliv_id int,
 	is_delivery bool not null,order_status varchar 
-	check(order_status='Serving' or order_status='Served' or order_status='Preparing' or order_status is null),
-	waiter_id int references waiter(waiter_id),transaction_id int references transactions(transaction_id),
+	check(order_status='Served' or order_status='Preparing' or order_status='delivering'),
+	item_name varchar, quantity int,
 	foreign key (customer_id) references customers(customer_id),
 	foreign key (table_id) references tables(table_id),
 	foreign key (deliv_id) references delivery(delivery_id));
@@ -47,8 +51,9 @@ for each row
 execute procedure update_order_status();
 
 --customer info
-create or replace function get_customer_info_by_id(customer_id int)
+create or replace function get_customer_info()
 returns table (
+	c_id int,
     customer_name varchar(100),
     customer_address varchar(100),
     customer_phone_no varchar(20),
@@ -58,99 +63,114 @@ as $$
 begin
     return query
     select 
+		customer_id as c_id,
         name as customer_name, 
         address as customer_address, 
         phone_no as customer_phone_no, 
         birthday as customer_birthday
     from 
-        customers
-    where 
-        customers.customer_id = get_customer_info_by_id.customer_id;
+        customers;
 end;
 $$ language plpgsql;
 
 --Function to get transactions
-create or replace function get_transactions_by_customer_id(customer_id int)
+create or replace function get_transactions()
 returns table (
-    transaction_id int,
-    amount numeric(10,2),
-    payment_method varchar,
-    date timestamp,
-    tips numeric(10,2)
+    t_id int,
+    amountt numeric(10,2),
+    p_method varchar,
+    datee date,
+    tipss numeric(10,2),
+	c_id int
 )
 as $$
 begin
     return query
     select 
-        transaction_id, amount, payment_method, time, tips
+        transaction_id as t_id, amount as amountt, payment_method as p_method, date as datee, tips as tipss, customer_id as c_id
     from 
-        transactions
-    where 
-        customer_id = get_transactions_by_customer_id.customer_id;
+        transactions;
 end;
 $$ language plpgsql;
+--drop function get_transactions()
 
 --Function to get delivery info
-create or replace function get_delivery_by_customer_id(customer_id int)
+create or replace function get_delivery()
 returns table (
-    delivery_id int,
-    delivery_status varchar,
-    address varchar(100)
+    d_id int,
+	c_id int,
+    addresss varchar
 )
 as $$
 begin
     return query
     select 
-        delivery_id, delivery_status, address
+        delivery_id as d_id, customer_id as c_id, address as addresss
     from 
-        delivery
-    where 
-        customer_id = get_delivery_by_customer_id.customer_id;
+        delivery;
 end;
 $$ language plpgsql;
+drop function get_delivery();
 
 --Function to get reservations
-create or replace function get_reservations_by_customer_id(customer_id int)
+create or replace function get_reservations()
 returns table (
-    reservation_id int,
-    table_id int,
-    date date,
-    size int
+    r_id int,
+	c_id int,
+    t int,
+    datee date,
+    sizee int
 )
 as $$
 begin
     return query
     select 
-        reservation_id, table_id, date, size
+        reservation_id as r_id, customer_id as c_id, table_id as t_id, date as datee, size as sizee
     from 
-        reservation
-    where 
-        customer_id = get_reservations_by_customer_id.customer_id;
+        reservation;
 end;
 $$ language plpgsql;
 
 --Function to get orders
-create or replace function get_orders_by_customer_id(customer_id int)
+create or replace function get_orders()
 returns table (
-    order_id int,
-    table_id int,
-    deliv_id int,
-    is_delivery bool,
-    order_status varchar,
-    waiter_id int,
-    transaction_id int
+    o_id int,
+	c_id int,
+    t_id int,
+    d_id int,
+    is_deliveryy bool,
+    order_statuss varchar,
+	item_namee varchar,
+	quantityy int
 )
 as $$
 begin
     return query
     select 
-        order_id, table_id, deliv_id, is_delivery, order_status, waiter_id, transaction_id
+        order_id as o_id,customer_id as c_id, table_id as t_id, deliv_id as d_id, is_delivery as is_deliveryy,
+		order_status as order_statuss, item_name as item_namee, quantity as quantityy
     from 
-        orders
-    where 
-        customer_id = get_orders_by_customer_id.customer_id;
+        orders;
 end;
 $$ language plpgsql;
+drop function get_orders();
+--Function to get Menu
+create or replace function get_menu()
+returns table (
+    i_name varchar,
+	descriptionn varchar,
+	pricee numeric
+)
+as $$
+begin
+    return query
+    select 
+        item_name as i_name, description as descriptionn , price as pricee
+    from 
+        menu;
+end;
+$$ language plpgsql;
+drop function get_menu();
 
 -- Inserting test data into the customers table
 insert into customers (name, address, phone_no, birthday) values
@@ -164,30 +184,25 @@ insert into tables (capacity, is_available) values
     (2, true),
     (6, false);
 
--- Inserting test data into the waiter table
-insert into waiter (waiter_name, waiter_tips) values
-    ('Tom', 50),
-    ('Anna', 30),
-    ('Mike', 20);
-
 -- Inserting test data into the transactions table
-insert into transactions (amount, payment_method, date, tips) values
-    (50.00, 'Cash', '2024-05-01', 5.00),
-    (75.00, 'Credit Card', '2024-05-02', 10.00),
-    (100.00, 'Cash', '2024-05-03', 15.00);
+insert into transactions (amount, payment_method, date, tips,customer_id) values
+    (50.00, 'Cash', '2024-05-01', 5.00,1),
+    (75.00, 'Credit Card', '2024-05-02', 10.00,2),
+    (100.00, 'Cash', '2024-05-03', 15.00,3);
 
 -- Inserting test data into the delivery table
-insert into delivery values
-    (1,'Delivered', '321 Street'),
-    (2,'Pending', 'XYZ Street'),
-    (3,'Delivered', '123 Street');
+insert into delivery (customer_id, address) values
+    (1,'321 Street'),
+    (2,'XYZ Street'),
+    (3,'123 Street');
+--truncate table delivery cascade;  
 
 -- Inserting test data into the orders table
-insert into orders (customer_id, table_id, deliv_id, is_delivery, order_status, waiter_id, transaction_id) values
-    (1, 1, NULL, false, 'Served', 1, 1),
-    (2, 2, NULL, false, 'Preparing', 2, 2),
-    (3, NULL, 1, true, NULL, NULL, 3);
-
+insert into orders (customer_id, table_id, deliv_id, is_delivery, order_status, item_name, quantity) values
+    (1, 1, NULL, false, 'Served','Pizza',2),
+    (2, 2, NULL, false, 'Preparing','Burger',1),
+    (3, NULL, 2, true, 'Preparing','Salad',1);
+select * from orders;
 
 -- Inserting test data into the reservation table
 insert into reservation (table_id, customer_id, date, size) values
@@ -200,4 +215,3 @@ insert into menu (item_name, description, price) values
     ('Pizza', 'Margherita Pizza', 10.00),
     ('Burger', 'Beef Burger', 8.00),
     ('Salad', 'Caesar Salad', 6.00);
-	
