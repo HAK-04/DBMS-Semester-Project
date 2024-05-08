@@ -4,7 +4,7 @@ from datetime import datetime
 # Database connection parameters
 DB_NAME = "dbmsproject"
 DB_USER = "postgres"
-DB_PASSWORD = "pgadmin4"
+DB_PASSWORD = "1234"
 DB_HOST = "localhost"
 DB_PORT = "5432"
 
@@ -96,14 +96,23 @@ def make_order():
         try:
             cursor = conn.cursor()
             customer_id = int(input("Enter customer ID: "))
+            delivery_id_input = input("Enter delivery ID (or leave blank for null): ")
+            if delivery_id_input.strip() == "":
+                delivery_id = None
+            else:
+                delivery_id = int(delivery_id_input)
             table_id = int(input("Enter table ID for the order: "))
-            item_name = input("Enter item name: ")
+            is_delivery = bool(input("Enter 1 if delivery otherwise 0: "))
+            item_name = (input("Enter item name: "))
             quantity = int(input("Enter quantity: "))
-            time = datetime.now()
-            cursor.execute("INSERT INTO orders (customer_id, table_id, item_name, quantity, time) VALUES (%s, %s, %s, %s, %s)",
-                           (customer_id, table_id, item_name, quantity, time))
-            conn.commit()
-            print("Order placed successfully.")
+            if (item_name != 'Pizza' or item_name != 'Burger' or item_name != 'Salad') :
+                print('item not included in menu')
+                return
+            else :
+                cursor.execute("INSERT INTO orders (customer_id, table_id,deliv_id,is_delivery, order_status,item_name, quantity) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (customer_id, table_id, delivery_id,is_delivery, 'Preparing', item_name, quantity))
+                conn.commit()
+                print("Order placed successfully.")
         except psycopg2.Error as e:
             conn.rollback()
             print("Error occurred while placing the order.")
@@ -159,7 +168,8 @@ def make_delivery_order():
         try:
             cursor = conn.cursor()
             address = input("Enter delivery address: ")
-            cursor.execute("INSERT INTO delivery (address) VALUES (%s) RETURNING delivery_id", (address,))
+            c_id = int(input("Enter customer id: "))
+            cursor.execute("INSERT INTO delivery (address,customer_id) VALUES (%s, %s) RETURNING delivery_id", (address,c_id))
             delivery_id = cursor.fetchone()[0]
             print("Delivery order placed successfully. Delivery ID:", delivery_id)
         except psycopg2.Error as e:
@@ -190,38 +200,19 @@ def remove_delivery_order():
                 cursor.close()
             conn.close()
 
-# Function to change delivery status
-def change_delivery_status():
-    conn = connect()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            delivery_id = int(input("Enter delivery ID to change status: "))
-            new_status = input("Enter new status: ")
-            cursor.execute("UPDATE delivery SET delivery_status = %s WHERE delivery_id = %s", (new_status, delivery_id))
-            conn.commit()
-            print("Delivery status changed successfully.")
-        except psycopg2.Error as e:
-            conn.rollback()
-            print("Error occurred while changing delivery status.")
-            print(e)
-        finally:
-            if cursor:
-                cursor.close()
-            conn.close()
-
 # Function to make a transaction
 def make_transaction():
     conn = connect()
     if conn:
         try:
             cursor = conn.cursor()
+            c_id = int(input("Enter customer id: "))
             amount = float(input("Enter transaction amount: "))
             payment_method = input("Enter payment method: ")
-            time = datetime.now()
+            date = input("Enter transaction date (YYYY-MM-DD): ")
             tips = float(input("Enter tips amount (if any): "))
-            cursor.execute("INSERT INTO transactions (amount, payment_method, time, tips) VALUES (%s, %s, %s, %s)",
-                           (amount, payment_method, time, tips))
+            cursor.execute("INSERT INTO transactions (amount, payment_method, date, tips, customer_id) VALUES (%s, %s, %s, %s, %s)",
+                           (amount, payment_method, date, tips, c_id))
             conn.commit()
             print("Transaction recorded successfully.")
         except psycopg2.Error as e:
@@ -233,24 +224,22 @@ def make_transaction():
                 cursor.close()
             conn.close()
                        
-# Function to display customer information by ID
-def display_customer_info_by_id():
+# Function to display customer information
+def display_customer_info():
     conn = connect()
     if conn:
         try:
             cursor = conn.cursor()
-            customer_id = int(input("Enter customer ID: "))
-            cursor.callproc("get_customer_info_by_id", (customer_id,))
+            cursor.callproc("get_customer_info")
             customer_info = cursor.fetchall()
-            if not customer_info:
-                print("No customer found with the given ID.")
-                return
             print("\nCustomer Information:")
             for row in customer_info:
-                print("Customer Name:", row[0])
-                print("Address:", row[1])
-                print("Phone Number:", row[2])
-                print("Birthday:", row[3])
+                print("Customer ID:", row[0])
+                print("Customer Name:", row[1])
+                print("Address:", row[2])
+                print("Phone Number:", row[3])
+                print("Birthday:", row[4])
+                print('\n')
         except psycopg2.Error as e:
             print("Error occurred while fetching customer information.")
             print(e)
@@ -258,25 +247,23 @@ def display_customer_info_by_id():
             if cursor:
                 cursor.close()
             conn.close()
-            # Function to display transactions by customer ID
-def display_transactions_by_customer_id():
+
+# Function to display transactions
+def display_transactions():
     conn = connect()
     if conn:
         try:
             cursor = conn.cursor()
-            customer_id = int(input("Enter customer ID: "))
-            cursor.callproc("get_transactions_by_customer_id", (customer_id,))
+            cursor.callproc("get_transactions")
             transactions = cursor.fetchall()
-            if not transactions:
-                print("No transactions found for the customer.")
-                return
-            print("\nTransactions for Customer ID:", customer_id)
             for transaction in transactions:
                 print("Transaction ID:", transaction[0])
+                print("Customer ID:", transaction[5])
                 print("Amount:", transaction[1])
                 print("Payment Method:", transaction[2])
                 print("Time:", transaction[3])
                 print("Tips:", transaction[4])
+                print('\n')
         except psycopg2.Error as e:
             print("Error occurred while fetching transactions.")
             print(e)
@@ -285,23 +272,19 @@ def display_transactions_by_customer_id():
                 cursor.close()
             conn.close()
 
-# Function to display delivery information by customer ID
-def display_delivery_by_customer_id():
+# Function to display delivery information
+def display_delivery():
     conn = connect()
     if conn:
         try:
             cursor = conn.cursor()
-            customer_id = int(input("Enter customer ID: "))
-            cursor.callproc("get_delivery_by_customer_id", (customer_id,))
+            cursor.callproc("get_delivery")
             deliveries = cursor.fetchall()
-            if not deliveries:
-                print("No deliveries found for the customer.")
-                return
-            print("\nDeliveries for Customer ID:", customer_id)
             for delivery in deliveries:
                 print("Delivery ID:", delivery[0])
-                print("Delivery Status:", delivery[1])
+                print("Customer ID:", delivery[1])
                 print("Address:", delivery[2])
+                print('\n')
         except psycopg2.Error as e:
             print("Error occurred while fetching deliveries.")
             print(e)
@@ -310,24 +293,21 @@ def display_delivery_by_customer_id():
                 cursor.close()
             conn.close()
 
-# Function to display reservations by customer ID
-def display_reservations_by_customer_id():
+# Function to display reservations
+def display_reservations():
     conn = connect()
     if conn:
         try:
             cursor = conn.cursor()
-            customer_id = int(input("Enter customer ID: "))
-            cursor.callproc("get_reservations_by_customer_id", (customer_id,))
+            cursor.callproc("get_reservations")
             reservations = cursor.fetchall()
-            if not reservations:
-                print("No reservations found for the customer.")
-                return
-            print("\nReservations for Customer ID:", customer_id)
             for reservation in reservations:
                 print("Reservation ID:", reservation[0])
-                print("Table ID:", reservation[1])
-                print("Date:", reservation[2])
-                print("Size:", reservation[3])
+                print("Customer ID:", reservation[1])
+                print("Table ID:", reservation[2])
+                print("Date:", reservation[3])
+                print("Size:", reservation[4])
+                print('\n')
         except psycopg2.Error as e:
             print("Error occurred while fetching reservations.")
             print(e)
@@ -336,27 +316,46 @@ def display_reservations_by_customer_id():
                 cursor.close()
             conn.close()
 
-# Function to display orders by customer ID
-def display_orders_by_customer_id():
+# Function to display menu
+def get_menu():
     conn = connect()
     if conn:
         try:
             cursor = conn.cursor()
-            customer_id = int(input("Enter customer ID: "))
-            cursor.callproc("get_orders_by_customer_id", (customer_id,))
+            cursor.callproc("get_menu")
+            menu = cursor.fetchall()
+            print("\nMENU:")
+            for m in menu:
+                print("Item name:", m[0])
+                print("Description:", m[1])
+                print("Price:", m[2])
+                print('\n')
+        except psycopg2.Error as e:
+            print("Error occurred while fetching reservations.")
+            print(e)
+        finally:
+            if cursor:
+                cursor.close()
+            conn.close()
+
+# Function to display orders
+def display_orders():
+    conn = connect()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.callproc("get_orders")
             orders = cursor.fetchall()
-            if not orders:
-                print("No orders found for the customer.")
-                return
-            print("\nOrders for Customer ID:", customer_id)
             for order in orders:
                 print("Order ID:", order[0])
-                print("Table ID:", order[1])
-                print("Delivery ID:", order[2])
-                print("Is Delivery:", order[3])
-                print("Order Status:", order[4])
-                print("Waiter ID:", order[5])
-                print("Transaction ID:", order[6])
+                print("Customer ID:", order[1])
+                print("Table ID:", order[2])
+                print("Delivery ID:", order[3])
+                print("Is Delivery:", order[4])
+                print("Order Status:", order[5])
+                print("Item name:", order[6])
+                print("Quantity:", order[7])
+                print("\n")
         except psycopg2.Error as e:
             print("Error occurred while fetching orders.")
             print(e)
@@ -377,7 +376,6 @@ def main():
         print("5. Change order status")
         print("6. Make a delivery order")
         print("7. Remove a delivery order")
-        print("8. Change delivery status")
         print("9. Make a transaction")
         print("0. Exit")
         print("A. Create a new customer")
@@ -398,8 +396,6 @@ def main():
             make_delivery_order()
         elif choice == "7":
             remove_delivery_order()
-        elif choice == "8":
-            change_delivery_status()
         elif choice == "9":
             make_transaction()
         elif choice.upper() == "A":
@@ -411,18 +407,21 @@ def main():
             print("3. Deliveries")
             print("4. Reservations")
             print("5. Orders")
+            print("6. Menu")
             print("0. Back")
             choice = input("Enter your choice: ")
             if choice == "1":
-                display_customer_info_by_id()
+                display_customer_info()
             elif choice == "2":
-                display_transactions_by_customer_id()
+                display_transactions()
             elif choice == "3":
-                display_delivery_by_customer_id()
+                display_delivery()
             elif choice == "4":
-                display_reservations_by_customer_id()
+                display_reservations()
             elif choice == "5":
-                display_orders_by_customer_id()
+                display_orders()
+            elif choice == "6":
+                get_menu()
             elif choice == "0":
                 break
             else:
